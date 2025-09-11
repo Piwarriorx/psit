@@ -14,6 +14,8 @@ local function isWithinTimeframe()
     return currentTime.min >= 0 and currentTime.min <= 20
 end
 
+wait(3)
+
 -- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RejoinGui"
@@ -275,3 +277,4 @@ while true do
         task.wait(1)
     end
 end
+
