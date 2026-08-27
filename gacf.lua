@@ -1,11 +1,11 @@
 --[[
-	MADIUM HUB  |  Grow a Chicken Fighter  (v8)
+	PI HUB  |  Grow a Chicken Fighter  (v8)
 	- Right Shift : menu toggle
-	- UNLOAD button sa menu o _G.MadiumHubDestroy()
+	- UNLOAD button sa menu o _G.PiHubDestroy()
 ]]
 
 -- LINIS MUNA: wasak ang lumang instance bago magsimula
-if type(_G.MadiumHubDestroy) == "function" then pcall(_G.MadiumHubDestroy) end
+if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
 _G.HubGen = (_G.HubGen or 0) + 1
 local GEN = _G.HubGen
 _G.FeederAutoUpgrade = false
@@ -47,16 +47,21 @@ local state = {
 	autoFeeders = false, uniformH = false,
 	claimAll = false, autoTower = false, autoRebirth = false,
 	autoChaos = false,
+	maxFeederLevel = 25,  -- bagong setting: hanggang saan mag-uupgrade
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
 		if type(v) == "boolean" then state[k] = v end
 	end
+	-- restore max level if saved
+	if _G.HubSavedState.maxFeederLevel then
+		state.maxFeederLevel = _G.HubSavedState.maxFeederLevel
+	end
 end
 _G.HubState = state
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "MadiumHub"
+gui.Name = "PiHub"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = 999
@@ -94,7 +99,7 @@ make("Frame", {
 
 make("TextLabel", {
 	Position = UDim2.fromOffset(14, 7), Size = UDim2.new(1, -60, 0, 18),
-	BackgroundTransparency = 1, Text = "MADIUM HUB", TextColor3 = TEXT,
+	BackgroundTransparency = 1, Text = "PI HUB", TextColor3 = TEXT,
 	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextSize = 15,
 }, header)
 make("TextLabel", {
@@ -153,8 +158,47 @@ local function addToggle(key, label, order, accent)
 	toggles[key] = { pill = pill, knob = knob, accent = accent or ACCENT }
 	row.MouseButton1Click:Connect(function()
 		state[key] = not state[key]
-		print("[MadiumHub] " .. key .. " = " .. tostring(state[key]))
+		print("[PiHub] " .. key .. " = " .. tostring(state[key]))
 	end)
+end
+
+-- ========== BAGONG FUNCTION: Number Input ==========
+local numberInputs = {}
+local function addNumberInput(key, label, order, default, min, max)
+	local row = make("TextButton", {
+		Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = CARD, LayoutOrder = order,
+		Text = "", AutoButtonColor = false,
+	}, body)
+	round(row, 9)
+	make("TextLabel", {
+		Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -120, 1, 0),
+		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
+		Font = Enum.Font.GothamMedium, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
+	}, row)
+	local box = make("TextBox", {
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
+		Size = UDim2.fromOffset(80, 26), BackgroundColor3 = OFF,
+		Text = tostring(state[key] or default), TextColor3 = TEXT,
+		Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center,
+		ClearTextOnFocus = false,
+	}, row)
+	round(box, 6)
+	make("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1 }, box)
+	numberInputs[key] = box
+	box.FocusLost:Connect(function(enterPressed)
+		local num = tonumber(box.Text)
+		if num then
+			num = math.floor(num)
+			if min and num < min then num = min end
+			if max and num > max then num = max end
+			state[key] = num
+			box.Text = tostring(num)
+			print("[PiHub] " .. key .. " = " .. num)
+		else
+			box.Text = tostring(state[key] or default)
+		end
+	end)
+	return box
 end
 
 local function paintToggles()
@@ -168,14 +212,16 @@ local function paintToggles()
 	end
 end
 
+-- ================= UI ORDERS (naayos) =================
 sectionLabel("FARMING", 1)
 addToggle("autoFeeders", "Auto Feeders (Buy > Upgrade)", 2)
-addToggle("autoTower", "Auto Tower Run (anti-KO)", 3)
-addToggle("autoChaos", "Auto Chaos (TO CHAOS)", 4)
-sectionLabel("REWARDS", 5)
-addToggle("claimAll", "Auto Claim All (Daily/Missions/etc)", 6)
-addToggle("autoRebirth", "AUTO REBIRTH - instant pag READY", 7, WARN)
-sectionLabel("WORLD", 8)
+addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
+addToggle("autoTower", "Auto Tower Run (anti-KO)", 4)
+addToggle("autoChaos", "Auto Chaos (TO CHAOS)", 5)
+sectionLabel("REWARDS", 6)
+addToggle("claimAll", "Auto Claim All (Daily/Missions/etc)", 7)
+addToggle("autoRebirth", "AUTO REBIRTH - instant pag READY", 8, WARN)
+sectionLabel("WORLD", 9)
 
 local function addButton(label, order, fn, color, textColor)
 	local b = make("TextButton", {
@@ -188,7 +234,7 @@ local function addButton(label, order, fn, color, textColor)
 	return b
 end
 
-addButton("Realistic Coop Heights   >", 9, function()
+addButton("Realistic Coop Heights   >", 10, function()
 	task.spawn(function()
 		local K = 2.0
 		for _, name in ipairs({ "Coop1", "Coop2", "Coop3" }) do
@@ -213,20 +259,20 @@ addButton("Realistic Coop Heights   >", 9, function()
 	end)
 end)
 
-addToggle("uniformH", "Uniform Player Heights", 10)
+addToggle("uniformH", "Uniform Player Heights", 11)
 
-local unloadBtn = addButton("UNLOAD SCRIPT", 11, function()
-	print("[MadiumHub] unload requested from menu")
-	if type(_G.MadiumHubDestroy) == "function" then
-		_G.MadiumHubDestroy()
+local unloadBtn = addButton("UNLOAD SCRIPT", 12, function()
+	print("[PiHub] unload requested from menu")
+	if type(_G.PiHubDestroy) == "function" then
+		_G.PiHubDestroy()
 	end
 end, Color3.fromRGB(60, 24, 28), Color3.fromRGB(255, 130, 130))
 round(unloadBtn, 9)
 
-sectionLabel("INFO", 12)
+sectionLabel("INFO", 13)
 
 local info = make("TextLabel", {
-	Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = CARD, LayoutOrder = 13,
+	Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = CARD, LayoutOrder = 14,
 	Text = "...", RichText = true, TextColor3 = DIM, Font = Enum.Font.Code, TextSize = 12,
 	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 }, body)
@@ -240,7 +286,7 @@ local fab = make("ImageButton", {
 }, gui)
 round(fab, 23)
 make("TextLabel", {
-	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "M",
+	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "P",
 	TextColor3 = Color3.fromRGB(10, 30, 24), Font = Enum.Font.GothamBlack, TextSize = 22, ZIndex = 6,
 }, fab)
 
@@ -350,6 +396,7 @@ task.spawn(function()
 					.. "\nRebirth #" .. tostring(cnt)
 					.. " -> needs floor " .. tostring(req)
 					.. (rbReady and " [READY]" or " [locked]")
+					.. "\nMax Feeder Level: " .. tostring(state.maxFeederLevel)
 			end)
 			info.Text = (okR and txt) or "-"
 		else
@@ -359,13 +406,14 @@ task.spawn(function()
 	end
 end)
 
--- ================= AUTO FEEDERS =================
+-- ================= AUTO FEEDERS (binago) =================
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoFeeders and okMods then
 			pcall(function()
 				local coop = Mods.Client:get({ "coop" })
 				if not coop then return end
+				-- Bumili ng bagong generator kung puwede (walang limit)
 				if Mods.CoopView.canBuyGenerator(coop.slots, #coop.generators) then
 					local cost = Mods.CoopView.buyGeneratorCost(#coop.generators)
 					if money() >= cost then
@@ -374,13 +422,17 @@ task.spawn(function()
 						coop = Mods.Client:get({ "coop" }) or coop
 					end
 				end
+				-- Mag-upgrade, pero hanggang maxFeederLevel lang
+				local maxLvl = state.maxFeederLevel or 999
 				for _, g in ipairs(coop.generators) do
 					local slot, lvl = tonumber(g.slot), tonumber(g.level)
 					if slot and lvl and Mods.CoopView.canUpgrade(lvl) then
-						local cost = Mods.CoopView.upgradeCost(lvl)
-						if money() >= cost then
-							RS.Remotes.UpgradeGenerator:InvokeServer(slot)
-							task.wait(0.6)
+						if lvl < maxLvl then
+							local cost = Mods.CoopView.upgradeCost(lvl)
+							if money() >= cost then
+								RS.Remotes.UpgradeGenerator:InvokeServer(slot)
+								task.wait(0.6)
+							end
 						end
 					end
 				end
@@ -396,19 +448,19 @@ task.spawn(function()
 		if state.claimAll and okMods then
 			pcall(function()
 				local r = RS.Remotes.DailyClaim:InvokeServer()
-				if r and r.ok then print("[MadiumHub] Claimed: daily") end
+				if r and r.ok then print("[PiHub] Claimed: daily") end
 			end)
 			pcall(function()
 				local r = RS.Remotes.SocialClaim:InvokeServer()
-				if r and r.ok then print("[MadiumHub] Claimed: community") end
+				if r and r.ok then print("[PiHub] Claimed: community") end
 			end)
 			pcall(function()
 				local r = RS.Remotes.PassClaim:InvokeServer()
-				if r and r.ok then print("[MadiumHub] Claimed: pass") end
+				if r and r.ok then print("[PiHub] Claimed: pass") end
 			end)
 			pcall(function()
 				local r = RS.Remotes.ClaimRebirthMilestones:InvokeServer()
-				if r and r.ok then print("[MadiumHub] Claimed: rebirth milestones") end
+				if r and r.ok then print("[PiHub] Claimed: rebirth milestones") end
 			end)
 			pcall(function()
 				local snap = { missions = Mods.Data.missions(), towerBest = Mods.Data.towerBest() }
@@ -420,7 +472,7 @@ task.spawn(function()
 					local claimed = Mods.MissionView.track(snap, def.scope).claimed or {}
 					if goal and prog >= goal and not claimed[tostring(def.id)] and not claimed[def.id] then
 						local r = RS.Remotes.MissionClaim:InvokeServer(def.id)
-						if r and r.ok then print("[MadiumHub] Claimed mission:", tostring(def.id)) end
+						if r and r.ok then print("[PiHub] Claimed mission:", tostring(def.id)) end
 						task.wait(0.5)
 					end
 				end
@@ -433,7 +485,6 @@ end)
 -- ================= AUTO TOWER =================
 local lastContinueAttempt = 0
 
--- CHANGED: Now we DECLINE the continue offer instead of accepting
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
 	local now = os.clock()
@@ -441,20 +492,17 @@ table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(fu
 	lastContinueAttempt = now
 	task.spawn(function()
 		task.wait(0.6)
-		-- Decline the offer to force restart from floor 1
 		pcall(function() RS.Remotes.TowerContinueDecline:FireServer() end)
-		print("[MadiumHub] Continue offer DECLINED")
+		print("[PiHub] Continue offer DECLINED")
 	end)
 end))
 
--- CHANGED: Added KO detection to surrender and decline, then restart later
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoTower and okMods then
 			local active = false
 			pcall(function() active = towerActive() end)
 			if active then
-				-- Check if chicken is KO
 				local ko = false
 				pcall(function()
 					local mine = myChickenBody()
@@ -467,7 +515,7 @@ task.spawn(function()
 					end
 				end)
 				if ko then
-					print("[MadiumHub] Chicken KO - surrendering run...")
+					print("[PiHub] Chicken KO - surrendering run...")
 					pcall(function()
 						Mods.ChickenMode.order("coop")
 						RS.Remotes.TowerSurrender:InvokeServer()
@@ -475,12 +523,11 @@ task.spawn(function()
 					task.delay(1, function()
 						pcall(function() RS.Remotes.TowerContinueDecline:FireServer() end)
 					end)
-					task.wait(4) -- wait for run to end
+					task.wait(4)
 				else
 					task.wait(2)
 				end
 			else
-				-- No tower active: start a fresh run from floor 1
 				local busyWithBoss = state.autoChaos and findBoss() ~= nil
 				if not busyWithBoss then
 					pcall(function()
@@ -488,9 +535,9 @@ task.spawn(function()
 						task.wait(0.35)
 						local res = RS.Remotes.TowerStart:InvokeServer()
 						if res and res.ok then
-							print("[MadiumHub] TowerStart OK (floor 1)!")
+							print("[PiHub] TowerStart OK (floor 1)!")
 						else
-							print("[MadiumHub] TowerStart fail:", tostring(res and res.error))
+							print("[PiHub] TowerStart fail:", tostring(res and res.error))
 						end
 					end)
 					task.wait(8)
@@ -518,7 +565,7 @@ local function tryRebirth(force)
 		local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
 		if okQ and best >= req then
 			local res = RS.Remotes.Rebirth:InvokeServer()
-			print("[MadiumHub] REBIRTH FIRED:", tostring(res and res.ok))
+			print("[PiHub] REBIRTH FIRED:", tostring(res and res.ok))
 		end
 	end)
 end
@@ -534,81 +581,4 @@ end))
 table.insert(_G.HubConns, RS.Remotes.TowerDefeat.OnClientEvent:Connect(function()
 	if GEN == _G.HubGen then
 		task.delay(1, function()
-			pcall(function() RS.Remotes.TowerContinueDecline:FireServer() end)
-		end)
-		task.delay(2, tryRebirth, true)
-	end
-end))
-
-task.spawn(function()
-	while GEN == _G.HubGen do
-		tryRebirth(false)
-		task.wait(5)
-	end
-end)
-
--- ================= AUTO CHAOS =================
-task.spawn(function()
-	while GEN == _G.HubGen do
-		if state.autoChaos and okMods then
-			pcall(function()
-				local boss = findBoss()
-				if boss then
-					local char = LP.Character
-					local hrp = char and char:FindFirstChild("HumanoidRootPart")
-					if hrp then
-						local bp = boss.Position
-						local dir = (hrp.Position - bp)
-						dir = Vector3.new(dir.X, 0, dir.Z)
-						if dir.Magnitude < 1 then dir = Vector3.new(1, 0, 0) end
-						dir = dir.Unit * 14
-						hrp.AssemblyLinearVelocity = Vector3.zero
-						char:PivotTo(CFrame.new(bp + dir + Vector3.new(0, 3, 0)) * (hrp.CFrame - hrp.Position))
-					end
-					state._lastChaosOrder = state._lastChaosOrder or 0
-					if os.clock() - state._lastChaosOrder > 3 then
-						state._lastChaosOrder = os.clock()
-						Mods.ChickenCtrl:setOrder("chaos")
-					end
-				else
-					state._lastChaosOrder = 0
-				end
-			end)
-		end
-		task.wait(2)
-	end
-end)
-
--- ================= UNIFORM HEIGHTS =================
-task.spawn(function()
-	local TARGETS = { BodyHeightScale = 1, BodyWidthScale = 1, HeadScale = 1, BodyDepthScale = 1, BodyProportionScale = 1 }
-	while GEN == _G.HubGen do
-		if state.uniformH then
-			pcall(function()
-				for _, plr in ipairs(Players:GetPlayers()) do
-					local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-					if hum then
-						for nm, val in pairs(TARGETS) do
-							local v = hum:FindFirstChild(nm)
-							if v and v:IsA("NumberValue") then v.Value = val end
-						end
-					end
-				end
-			end)
-		end
-		task.wait(2)
-	end
-end)
-
--- ================= UNLOAD =================
-_G.MadiumHubDestroy = function()
-	_G.HubGen = _G.HubGen + 1
-	for _, c in ipairs(_G.HubConns) do pcall(function() c:Disconnect() end) end
-	table.clear(_G.HubConns)
-	gui:Destroy()
-	_G.MadiumHubDestroy = nil
-	print("[MadiumHub] unloaded")
-end
-
-print("[MadiumHub] loaded (gen " .. GEN .. ") - RightShift to toggle")
-setVisible(true)
+			pcall(funct
