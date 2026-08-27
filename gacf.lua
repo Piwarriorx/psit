@@ -50,13 +50,13 @@ local DIM = Color3.fromRGB(150, 150, 165)
 local OFF = Color3.fromRGB(55, 55, 68)
 
 local state = {
-	autoFeeders = false,
+	autoFeeders = true,
 	claimAll = false,
-	autoTower = false,
-	autoRebirth = false,
+	autoTower = true,
+	autoRebirth = true,
 	autoChaos = false,
 	maxFeederLevel = 25,
-	hpThreshold = 100,
+	hpThreshold = 99,
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
