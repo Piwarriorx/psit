@@ -514,7 +514,7 @@ task.spawn(function()
 					task.delay(1, function()
 						pcall(function() RS.Remotes.TowerContinueDecline:FireServer() end)
 					end)
-					task.wait(4)
+					task.wait(12)
 				else
 					task.wait(2)
 				end
