@@ -46,7 +46,7 @@ local state = {
 	autoFeeders = false, uniformH = false,
 	claimAll = false, autoTower = false, autoRebirth = false,
 	autoChaos = false,
-	maxFeederLevel = 999,
+	maxFeederLevel = 25,
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
@@ -62,7 +62,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "PiHub"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 25
+gui.DisplayOrder = 100
 gui.Parent = PG
 
 local function make(class, props, parent)
