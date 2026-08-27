@@ -1,10 +1,11 @@
 --[[
-	PI HUB  |  Grow a Chicken Fighter  (v8.7)
+	PI HUB  |  Grow a Chicken Fighter  (v8.7)  [FIXED REBIRTH]
 	- Right Shift / tap P icon : menu toggle
 	- UNLOAD button sa menu o _G.PiHubDestroy()
 	- HP threshold slider (1–100%) bago mag-tower run
 	- Draggable floating icon (mobile-friendly)
 	- Compact at centered menu para sa mobile
+	- FIX: Awtomatikong nagre-retreat sa tower kapag ready na mag-rebirth
 ]]
 
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
@@ -87,15 +88,14 @@ end
 
 -- ===== COMPACT & CENTERED MAIN WINDOW =====
 local main = make("Frame", {
-	Size = UDim2.fromScale(0.8, 0.65),  -- 80% width, 65% height
-	AnchorPoint = Vector2.new(0.5, 0.5), -- center anchor
-	Position = UDim2.new(0.5, 0, 0.5, 0), -- center
+	Size = UDim2.fromScale(0.8, 0.65),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
 	BackgroundColor3 = BG, Active = true, Visible = false,
 }, gui)
 round(main, 12)
 make("UIStroke", { Color = Color3.fromRGB(65, 65, 90), Thickness = 1 }, main)
 
--- Mas maliit na header
 local header = make("Frame", {
 	Size = UDim2.new(1, 0, 0, 40), 
 	BackgroundColor3 = Color3.fromRGB(13, 13, 18),
@@ -125,7 +125,6 @@ local closeBtn = make("TextButton", {
 }, header)
 round(closeBtn, 8)
 
--- Mas maliit na body
 local body = make("ScrollingFrame", {
 	Position = UDim2.fromOffset(8, 46), Size = UDim2.new(1, -16, 1, -54),
 	BackgroundTransparency = 1, BorderSizePixel = 0,
@@ -236,9 +235,9 @@ local function addSlider(key, label, order, default, minVal, maxVal)
 		Text = "", AutoButtonColor = false,
 	}, slider)
 	round(drag, 9)
-	
+
 	sliderObjects[key] = { slider = slider, fill = fill, drag = drag, label = labelObj, row = row }
-	
+
 	local function updateSlider(val)
 		val = math.clamp(val, minVal or 0, maxVal or 100)
 		state[key] = val
@@ -247,7 +246,7 @@ local function addSlider(key, label, order, default, minVal, maxVal)
 		labelObj.Text = label .. ": " .. tostring(val) .. "%"
 		print("[PiHub] " .. key .. " = " .. val)
 	end
-	
+
 	drag.MouseButton1Down:Connect(function()
 		local con, con2
 		con = UIS.InputChanged:Connect(function(input)
@@ -320,7 +319,7 @@ local info = make("TextLabel", {
 round(info, 8)
 make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingTop = UDim.new(0, 6) }, info)
 
--- ===== FLOATING ICON (mas maliit) =====
+-- ===== FLOATING ICON =====
 local fab = make("ImageButton", {
 	Size = UDim2.fromOffset(50, 50), 
 	Position = UDim2.new(0, 10, 0, 80),
@@ -375,7 +374,7 @@ UIS.InputBegan:Connect(function(input, gp)
 	end
 end)
 
--- ===== HELPERS (walang pagbabago) =====
+-- ===== HELPERS =====
 local function money()
 	if not okMods then return 0 end
 	local ok, n = pcall(function() return Mods.Data.money():toNumber() end)
@@ -537,7 +536,7 @@ task.spawn(function()
 	end
 end)
 
--- ===== AUTO TOWER (with HP threshold) =====
+-- ===== AUTO TOWER (with HP threshold + rebirth readiness check) =====
 local lastContinueAttempt = 0
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
@@ -584,28 +583,47 @@ task.spawn(function()
 			else
 				local busyWithBoss = state.autoChaos and findBoss() ~= nil
 				if not busyWithBoss then
-					local hp = 0
-					pcall(function()
-						local mine = myChickenBody()
-						if mine then
-							hp = tonumber(mine:GetAttribute(Mods.BodyProxy.Attr.HpFrac)) or 0
-						end
-					end)
-					local threshold = (state.hpThreshold or 100) / 100
-					if hp >= threshold then
+					-- 【BAGONG CHECK】Huwag magsimula ng tower kung ready na mag-rebirth
+					local rebirthReady = false
+					if state.autoRebirth and okMods then
 						pcall(function()
-							Mods.ChickenMode.order("tower")
-							task.wait(0.35)
-							local res = RS.Remotes.TowerStart:InvokeServer()
-							if res and res.ok then
-								print("[PiHub] TowerStart OK (floor 1)! HP: " .. math.floor(hp*100) .. "%")
-							else
-								print("[PiHub] TowerStart fail:", tostring(res and res.error))
+							local rb = Mods.Data.rebirth()
+							local cnt = rb and rb.count or 0
+							local best = tonumber(Mods.Data.towerBest()) or 0
+							local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
+							if okQ and best >= req then
+								rebirthReady = true
 							end
 						end)
-						task.wait(8)
+					end
+
+					if not rebirthReady then
+						local hp = 0
+						pcall(function()
+							local mine = myChickenBody()
+							if mine then
+								hp = tonumber(mine:GetAttribute(Mods.BodyProxy.Attr.HpFrac)) or 0
+							end
+						end)
+						local threshold = (state.hpThreshold or 100) / 100
+						if hp >= threshold then
+							pcall(function()
+								Mods.ChickenMode.order("tower")
+								task.wait(0.35)
+								local res = RS.Remotes.TowerStart:InvokeServer()
+								if res and res.ok then
+									print("[PiHub] TowerStart OK (floor 1)! HP: " .. math.floor(hp*100) .. "%")
+								else
+									print("[PiHub] TowerStart fail:", tostring(res and res.error))
+								end
+							end)
+							task.wait(8)
+						else
+							print("[PiHub] HP " .. math.floor(hp*100) .. "% < threshold " .. state.hpThreshold .. "%. Waiting...")
+							task.wait(2)
+						end
 					else
-						print("[PiHub] HP " .. math.floor(hp*100) .. "% < threshold " .. state.hpThreshold .. "%. Waiting...")
+						print("[PiHub] Ready for rebirth, skipping tower start.")
 						task.wait(2)
 					end
 				end
@@ -618,48 +636,38 @@ end)
 -- ===== REBIRTH (with auto-retreat) =====
 local lastRebirthTry = 0
 local function tryRebirth(force)
-    if GEN ~= _G.HubGen then return end
-    if not (state.autoRebirth and okMods) then return end
+	if GEN ~= _G.HubGen then return end
+	if not (state.autoRebirth and okMods) then return end
 
-    local now = os.clock()
-    if not force and now - lastRebirthTry < 4 then return end
-    lastRebirthTry = now
+	local now = os.clock()
+	if not force and now - lastRebirthTry < 4 then return end
+	lastRebirthTry = now
 
-    pcall(function()
-        -- Kunin ang rebirth data at requirements
-        local rb = Mods.Data.rebirth()
-        local cnt = rb and rb.count or 0
-        local best = tonumber(Mods.Data.towerBest()) or 0
-        local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
-        
-        -- Kung hindi pa ready mag-rebirth, exit
-        if not (okQ and best >= req) then return end
+	pcall(function()
+		local rb = Mods.Data.rebirth()
+		local cnt = rb and rb.count or 0
+		local best = tonumber(Mods.Data.towerBest()) or 0
+		local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
+		if not (okQ and best >= req) then return end
 
-        -- [BAGONG LOGIC] Tingnan kung active ang tower
-        local active, _ = towerActive()
-        if active then
-            print("[PiHub] Ready to rebirth pero nasa Tower pa. Nagre-retreat...")
-            
-            -- 1. I-surrender ang tower run
-            RS.Remotes.TowerSurrender:InvokeServer()
-            
-            -- 2. I-decline din ang continue offer (para sure)
-            RS.Remotes.TowerContinueDecline:FireServer()
-            
-            -- 3. Maghintay ng 2.5 segundo para bumalik sa coop
-            task.wait(2.5)
-        end
+		-- 【BAGONG LOGIC】Kung nasa tower, sumuko muna
+		local active, _ = towerActive()
+		if active then
+			print("[PiHub] Ready to rebirth but tower is active. Retreating...")
+			RS.Remotes.TowerSurrender:InvokeServer()
+			RS.Remotes.TowerContinueDecline:FireServer()
+			task.wait(2.5)
+		end
 
-        -- Pagkatapos maghintay (o kung hindi naman active), subukang mag-rebirth
-        -- Double-check kung active pa rin (baka nag-glitch)
-        local stillActive, _ = towerActive()
-        if not stillActive then
-            local res = RS.Remotes.Rebirth:InvokeServer()
-            print("[PiHub] REBIRTH FIRED:", tostring(res and res.ok))
-        else
-            print("[PiHub] Tower still active after retreat, cannot rebirth yet.")
-        end
-    end)
+		-- Double‑check kung wala na sa tower
+		local stillActive, _ = towerActive()
+		if not stillActive then
+			local res = RS.Remotes.Rebirth:InvokeServer()
+			print("[PiHub] REBIRTH FIRED:", tostring(res and res.ok))
+		else
+			print("[PiHub] Tower still active after retreat, cannot rebirth yet.")
+		end
+	end)
 end
 
 table.insert(_G.HubConns, RS.Remotes.TowerRunEnded.OnClientEvent:Connect(function()
