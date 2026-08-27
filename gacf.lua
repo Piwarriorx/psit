@@ -1,11 +1,10 @@
 --[[
-	PI HUB  |  Grow a Chicken Fighter  (v9.0)
+	PI HUB  |  Grow a Chicken Fighter  (v8.7)
 	- Right Shift / tap P icon : menu toggle
 	- UNLOAD button sa menu o _G.PiHubDestroy()
 	- HP threshold slider (1–100%) bago mag-tower run
 	- Draggable floating icon (mobile-friendly)
-	- Compact & centered (70% x 55%)
-	- Anti-AFK toggle (VirtualInputManager – walang character movement)
+	- Compact at centered menu para sa mobile
 ]]
 
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
@@ -19,7 +18,6 @@ local RS = game:GetService("ReplicatedStorage")
 local CS = game:GetService("CollectionService")
 local TS = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
 
@@ -57,7 +55,6 @@ local state = {
 	autoTower = false,
 	autoRebirth = false,
 	autoChaos = false,
-	antiAFK = false,            -- <-- BAGONG TOGGLE
 	maxFeederLevel = 25,
 	hpThreshold = 100,
 }
@@ -88,19 +85,19 @@ local function round(o, r)
 	make("UICorner", { CornerRadius = UDim.new(0, r or 8) }, o)
 end
 
--- ===== MAIN WINDOW (FORCED CENTER) =====
+-- ===== COMPACT & CENTERED MAIN WINDOW =====
 local main = make("Frame", {
-	Size = UDim2.fromScale(0.7, 0.55),
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.fromScale(0.8, 0.65),  -- 80% width, 65% height
+	AnchorPoint = Vector2.new(0.5, 0.5), -- center anchor
+	Position = UDim2.new(0.5, 0, 0.5, 0), -- center
 	BackgroundColor3 = BG, Active = true, Visible = false,
 }, gui)
 round(main, 12)
 make("UIStroke", { Color = Color3.fromRGB(65, 65, 90), Thickness = 1 }, main)
 
--- HEADER
+-- Mas maliit na header
 local header = make("Frame", {
-	Size = UDim2.new(1, 0, 0, 36), 
+	Size = UDim2.new(1, 0, 0, 40), 
 	BackgroundColor3 = Color3.fromRGB(13, 13, 18),
 }, main)
 round(header, 12)
@@ -111,38 +108,37 @@ make("Frame", {
 }, header)
 
 make("TextLabel", {
-	Position = UDim2.fromOffset(10, 5), Size = UDim2.new(1, -50, 0, 16),
+	Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -50, 0, 18),
 	BackgroundTransparency = 1, Text = "PI HUB", TextColor3 = TEXT,
-	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextSize = 15,
+	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextSize = 16,
 }, header)
 make("TextLabel", {
-	Position = UDim2.fromOffset(10, 19), Size = UDim2.new(1, -50, 0, 12),
+	Position = UDim2.fromOffset(10, 22), Size = UDim2.new(1, -50, 0, 14),
 	BackgroundTransparency = 1, Text = "Grow a Chicken Fighter", TextColor3 = DIM,
-	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham, TextSize = 10,
+	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham, TextSize = 11,
 }, header)
 
 local closeBtn = make("TextButton", {
 	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
-	Size = UDim2.fromOffset(24, 24), BackgroundColor3 = Color3.fromRGB(40, 40, 52),
-	Text = "X", TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 13,
+	Size = UDim2.fromOffset(26, 26), BackgroundColor3 = Color3.fromRGB(40, 40, 52),
+	Text = "X", TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 14,
 }, header)
 round(closeBtn, 8)
 
--- BODY
+-- Mas maliit na body
 local body = make("ScrollingFrame", {
-	Position = UDim2.fromOffset(8, 42), Size = UDim2.new(1, -16, 1, -50),
+	Position = UDim2.fromOffset(8, 46), Size = UDim2.new(1, -16, 1, -54),
 	BackgroundTransparency = 1, BorderSizePixel = 0,
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	CanvasSize = UDim2.new(), ScrollBarThickness = 3, ScrollBarImageColor3 = OFF,
 }, main)
-make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, body)
-make("UIPadding", { PaddingBottom = UDim.new(0, 4) }, body)
+make("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }, body)
+make("UIPadding", { PaddingBottom = UDim.new(0, 5) }, body)
 
--- ===== UI HELPERS =====
 local function sectionLabel(text, order)
 	make("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = order,
-		Text = text, TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 11,
+		Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = order,
+		Text = text, TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, body)
 end
@@ -150,25 +146,25 @@ end
 local toggles = {}
 local function addToggle(key, label, order, accent)
 	local row = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = CARD, LayoutOrder = order,
 		Text = "", AutoButtonColor = false,
 	}, body)
-	round(row, 7)
+	round(row, 8)
 	make("TextLabel", {
-		Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -70, 1, 0),
+		Position = UDim2.fromOffset(10, 0), Size = UDim2.new(1, -80, 1, 0),
 		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
-		Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+		Font = Enum.Font.GothamMedium, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
 	}, row)
 	local pill = make("Frame", {
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0),
-		Size = UDim2.fromOffset(38, 18), BackgroundColor3 = OFF,
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+		Size = UDim2.fromOffset(44, 22), BackgroundColor3 = OFF,
 	}, row)
-	round(pill, 9)
+	round(pill, 11)
 	local knob = make("Frame", {
-		Position = UDim2.fromOffset(2, 2), Size = UDim2.fromOffset(14, 14),
+		Position = UDim2.fromOffset(3, 3), Size = UDim2.fromOffset(16, 16),
 		BackgroundColor3 = Color3.fromRGB(200, 200, 210),
 	}, pill)
-	round(knob, 7)
+	round(knob, 8)
 	toggles[key] = { pill = pill, knob = knob, accent = accent or ACCENT }
 	row.MouseButton1Click:Connect(function()
 		state[key] = not state[key]
@@ -178,23 +174,23 @@ end
 
 local function addNumberInput(key, label, order, default, minVal, maxVal)
 	local row = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = CARD, LayoutOrder = order,
 		Text = "", AutoButtonColor = false,
 	}, body)
-	round(row, 7)
+	round(row, 8)
 	make("TextLabel", {
-		Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -85, 1, 0),
+		Position = UDim2.fromOffset(10, 0), Size = UDim2.new(1, -100, 1, 0),
 		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
-		Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+		Font = Enum.Font.GothamMedium, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
 	}, row)
 	local box = make("TextBox", {
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0),
-		Size = UDim2.fromOffset(60, 20), BackgroundColor3 = OFF,
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+		Size = UDim2.fromOffset(70, 24), BackgroundColor3 = OFF,
 		Text = tostring(state[key] or default), TextColor3 = TEXT,
-		Font = Enum.Font.GothamBold, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center,
 		ClearTextOnFocus = false,
 	}, row)
-	round(box, 5)
+	round(box, 6)
 	make("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1 }, box)
 	box.FocusLost:Connect(function()
 		local num = tonumber(box.Text)
@@ -215,31 +211,31 @@ end
 local sliderObjects = {}
 local function addSlider(key, label, order, default, minVal, maxVal)
 	local row = make("Frame", {
-		Size = UDim2.new(1, 0, 0, 42), BackgroundColor3 = CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 48), BackgroundColor3 = CARD, LayoutOrder = order,
 	}, body)
-	round(row, 7)
+	round(row, 8)
 	local labelObj = make("TextLabel", {
-		Position = UDim2.fromOffset(8, 3), Size = UDim2.new(1, -20, 0, 14),
+		Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, 16),
 		BackgroundTransparency = 1, Text = label .. ": " .. tostring(state[key] or default) .. "%",
-		TextColor3 = TEXT, Font = Enum.Font.GothamMedium, TextSize = 11,
+		TextColor3 = TEXT, Font = Enum.Font.GothamMedium, TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, row)
 	local slider = make("Frame", {
-		Position = UDim2.fromOffset(8, 20), Size = UDim2.new(1, -60, 0, 12),
+		Position = UDim2.fromOffset(10, 24), Size = UDim2.new(1, -70, 0, 14),
 		BackgroundColor3 = OFF,
 	}, row)
-	round(slider, 6)
+	round(slider, 7)
 	local fill = make("Frame", {
 		Size = UDim2.new((state[key] or default) / 100, 0, 1, 0),
 		BackgroundColor3 = ACCENT,
 	}, slider)
-	round(fill, 6)
+	round(fill, 7)
 	local drag = make("TextButton", {
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new((state[key] or default) / 100, 0, 0.5, 0),
-		Size = UDim2.fromOffset(16, 16), BackgroundColor3 = Color3.fromRGB(255,255,255),
+		Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Color3.fromRGB(255,255,255),
 		Text = "", AutoButtonColor = false,
 	}, slider)
-	round(drag, 8)
+	round(drag, 9)
 	
 	sliderObjects[key] = { slider = slider, fill = fill, drag = drag, label = labelObj, row = row }
 	
@@ -281,13 +277,13 @@ local function paintToggles()
 		local on = state[key] == true
 		TS:Create(t.pill, TweenInfo.new(0.18), { BackgroundColor3 = on and t.accent or OFF }):Play()
 		TS:Create(t.knob, TweenInfo.new(0.18), {
-			Position = on and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2),
+			Position = on and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3),
 			BackgroundColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 210),
 		}):Play()
 	end
 end
 
--- ===== UI LAYOUT =====
+-- ===== UI LAYOUT (compact) =====
 sectionLabel("FARMING", 1)
 addToggle("autoFeeders", "Auto Feeders", 2)
 addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
@@ -298,35 +294,33 @@ addToggle("claimAll", "Auto Claim All", 7)
 addToggle("autoRebirth", "Auto Rebirth", 8, WARN)
 sectionLabel("TOWER HP", 9)
 addSlider("hpThreshold", "HP threshold to start", 10, 100, 1, 100)
-sectionLabel("WORLD", 11)
-addToggle("antiAFK", "Anti-AFK (no movement)", 12)
 
 local function addButton(label, order, fn, color, textColor)
 	local b = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = color or CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = color or CARD, LayoutOrder = order,
 		Text = label, TextColor3 = textColor or TEXT, Font = Enum.Font.GothamBold,
-		TextSize = 12, AutoButtonColor = false,
+		TextSize = 13, AutoButtonColor = false,
 	}, body)
-	round(b, 7)
+	round(b, 8)
 	b.MouseButton1Click:Connect(fn)
 	return b
 end
 
-local unloadBtn = addButton("UNLOAD SCRIPT", 13, function()
+local unloadBtn = addButton("UNLOAD SCRIPT", 11, function()
 	print("[PiHub] unload requested from menu")
 	if type(_G.PiHubDestroy) == "function" then _G.PiHubDestroy() end
 end, Color3.fromRGB(60, 24, 28), Color3.fromRGB(255, 130, 130))
 
-sectionLabel("INFO", 14)
+sectionLabel("INFO", 12)
 local info = make("TextLabel", {
-	Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = CARD, LayoutOrder = 15,
-	Text = "...", RichText = true, TextColor3 = DIM, Font = Enum.Font.Code, TextSize = 10,
+	Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = CARD, LayoutOrder = 13,
+	Text = "...", RichText = true, TextColor3 = DIM, Font = Enum.Font.Code, TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 }, body)
-round(info, 7)
+round(info, 8)
 make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingTop = UDim.new(0, 6) }, info)
 
--- ===== FLOATING ICON =====
+-- ===== FLOATING ICON (mas maliit) =====
 local fab = make("ImageButton", {
 	Size = UDim2.fromOffset(50, 50), 
 	Position = UDim2.new(0, 10, 0, 80),
@@ -381,7 +375,7 @@ UIS.InputBegan:Connect(function(input, gp)
 	end
 end)
 
--- ===== HELPERS =====
+-- ===== HELPERS (walang pagbabago) =====
 local function money()
 	if not okMods then return 0 end
 	local ok, n = pcall(function() return Mods.Data.money():toNumber() end)
@@ -696,21 +690,6 @@ task.spawn(function()
 			end)
 		end
 		task.wait(2)
-	end
-end)
-
--- ===== ANTI-AFK (VirtualInputManager – walang galaw) =====
-task.spawn(function()
-	while GEN == _G.HubGen do
-		if state.antiAFK then
-			pcall(function()
-				-- Fake keypress ng "F1" (walang function sa laro)
-				VIM:SendKeyEvent(true, Enum.KeyCode.F1, false, game)
-				task.wait(0.1)
-				VIM:SendKeyEvent(false, Enum.KeyCode.F1, false, game)
-			end)
-		end
-		task.wait(60) -- every 60 seconds
 	end
 end)
 
