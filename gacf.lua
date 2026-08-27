@@ -1,7 +1,9 @@
 --[[
 	PI HUB  |  Grow a Chicken Fighter  (v8)
-	- Right Shift : menu toggle
+	- Right Shift / tap P icon : menu toggle
 	- UNLOAD button sa menu o _G.PiHubDestroy()
+	- HP threshold slider (1–100%) bago mag-tower run
+	- Draggable floating icon
 ]]
 
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
@@ -47,14 +49,14 @@ local state = {
 	claimAll = false, autoTower = false, autoRebirth = false,
 	autoChaos = false,
 	maxFeederLevel = 25,
+	hpThreshold = 100,   -- default 100% (full HP)
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
 		if type(v) == "boolean" then state[k] = v end
 	end
-	if _G.HubSavedState.maxFeederLevel then
-		state.maxFeederLevel = _G.HubSavedState.maxFeederLevel
-	end
+	if _G.HubSavedState.maxFeederLevel then state.maxFeederLevel = _G.HubSavedState.maxFeederLevel end
+	if _G.HubSavedState.hpThreshold then state.hpThreshold = _G.HubSavedState.hpThreshold end
 end
 _G.HubState = state
 
@@ -76,16 +78,17 @@ local function round(o, r)
 	make("UICorner", { CornerRadius = UDim.new(0, r or 8) }, o)
 end
 
+-- ================= MAIN WINDOW (mobile-friendly) =================
 local main = make("Frame", {
-	Size = UDim2.fromOffset(320, 440),
-	Position = UDim2.new(0.5, -160, 0.5, -220),
+	Size = UDim2.fromScale(0.9, 0.85),  -- gumagamit ng scale para flexible
+	Position = UDim2.new(0.5, -160, 0.5, -240), -- center
 	BackgroundColor3 = BG, Active = true, Visible = false,
 }, gui)
 round(main, 12)
 make("UIStroke", { Color = Color3.fromRGB(65, 65, 90), Thickness = 1 }, main)
 
 local header = make("Frame", {
-	Size = UDim2.new(1, 0, 0, 44), BackgroundColor3 = Color3.fromRGB(13, 13, 18),
+	Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Color3.fromRGB(13, 13, 18),
 }, main)
 round(header, 12)
 make("Frame", {
@@ -95,36 +98,36 @@ make("Frame", {
 }, header)
 
 make("TextLabel", {
-	Position = UDim2.fromOffset(14, 7), Size = UDim2.new(1, -60, 0, 18),
+	Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -60, 0, 22),
 	BackgroundTransparency = 1, Text = "PI HUB", TextColor3 = TEXT,
-	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextSize = 15,
+	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextSize = 18,
 }, header)
 make("TextLabel", {
-	Position = UDim2.fromOffset(14, 25), Size = UDim2.new(1, -60, 0, 12),
+	Position = UDim2.fromOffset(14, 32), Size = UDim2.new(1, -60, 0, 16),
 	BackgroundTransparency = 1, Text = "Grow a Chicken Fighter", TextColor3 = DIM,
-	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham, TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham, TextSize = 13,
 }, header)
 
 local closeBtn = make("TextButton", {
-	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-	Size = UDim2.fromOffset(26, 26), BackgroundColor3 = Color3.fromRGB(40, 40, 52),
-	Text = "X", TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 12,
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
+	Size = UDim2.fromOffset(32, 32), BackgroundColor3 = Color3.fromRGB(40, 40, 52),
+	Text = "X", TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 16,
 }, header)
 round(closeBtn, 8)
 
 local body = make("ScrollingFrame", {
-	Position = UDim2.fromOffset(10, 52), Size = UDim2.new(1, -20, 1, -62),
+	Position = UDim2.fromOffset(12, 62), Size = UDim2.new(1, -24, 1, -74),
 	BackgroundTransparency = 1, BorderSizePixel = 0,
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	CanvasSize = UDim2.new(), ScrollBarThickness = 3, ScrollBarImageColor3 = OFF,
+	CanvasSize = UDim2.new(), ScrollBarThickness = 4, ScrollBarImageColor3 = OFF,
 }, main)
-make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, body)
-make("UIPadding", { PaddingBottom = UDim.new(0, 6) }, body)
+make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, body)
+make("UIPadding", { PaddingBottom = UDim.new(0, 8) }, body)
 
 local function sectionLabel(text, order)
 	make("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = order,
-		Text = text, TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 11,
+		Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = order,
+		Text = text, TextColor3 = DIM, Font = Enum.Font.GothamBold, TextSize = 14,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, body)
 end
@@ -132,25 +135,25 @@ end
 local toggles = {}
 local function addToggle(key, label, order, accent)
 	local row = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 42), BackgroundColor3 = CARD, LayoutOrder = order,
 		Text = "", AutoButtonColor = false,
 	}, body)
 	round(row, 9)
 	make("TextLabel", {
-		Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -80, 1, 0),
+		Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -90, 1, 0),
 		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
-		Font = Enum.Font.GothamMedium, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
+		Font = Enum.Font.GothamMedium, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left,
 	}, row)
 	local pill = make("Frame", {
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-		Size = UDim2.fromOffset(42, 22), BackgroundColor3 = OFF,
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(52, 28), BackgroundColor3 = OFF,
 	}, row)
-	round(pill, 11)
+	round(pill, 14)
 	local knob = make("Frame", {
-		Position = UDim2.fromOffset(3, 3), Size = UDim2.fromOffset(16, 16),
+		Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(20, 20),
 		BackgroundColor3 = Color3.fromRGB(200, 200, 210),
 	}, pill)
-	round(knob, 8)
+	round(knob, 10)
 	toggles[key] = { pill = pill, knob = knob, accent = accent or ACCENT }
 	row.MouseButton1Click:Connect(function()
 		state[key] = not state[key]
@@ -158,43 +161,70 @@ local function addToggle(key, label, order, accent)
 	end)
 end
 
--- Number input
-local numberInputs = {}
-local function addNumberInput(key, label, order, default, minVal, maxVal)
-	local row = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = CARD, LayoutOrder = order,
-		Text = "", AutoButtonColor = false,
+-- ================= SLIDER para sa HP Threshold =================
+local sliderObjects = {}
+local function addSlider(key, label, order, default, minVal, maxVal)
+	local row = make("Frame", {
+		Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = CARD, LayoutOrder = order,
 	}, body)
 	round(row, 9)
-	make("TextLabel", {
-		Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -120, 1, 0),
-		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
-		Font = Enum.Font.GothamMedium, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
+	local labelObj = make("TextLabel", {
+		Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -20, 0, 20),
+		BackgroundTransparency = 1, Text = label .. ": " .. tostring(state[key] or default) .. "%",
+		TextColor3 = TEXT, Font = Enum.Font.GothamMedium, TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
 	}, row)
-	local box = make("TextBox", {
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-		Size = UDim2.fromOffset(80, 26), BackgroundColor3 = OFF,
-		Text = tostring(state[key] or default), TextColor3 = TEXT,
-		Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center,
-		ClearTextOnFocus = false,
+	local slider = make("Frame", {
+		Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -80, 0, 18),
+		BackgroundColor3 = OFF,
 	}, row)
-	round(box, 6)
-	make("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1 }, box)
-	numberInputs[key] = box
-	box.FocusLost:Connect(function(enterPressed)
-		local num = tonumber(box.Text)
-		if num then
-			num = math.floor(num)
-			if minVal and num < minVal then num = minVal end
-			if maxVal and num > maxVal then num = maxVal end
-			state[key] = num
-			box.Text = tostring(num)
-			print("[PiHub] " .. key .. " = " .. num)
-		else
-			box.Text = tostring(state[key] or default)
+	round(slider, 9)
+	local fill = make("Frame", {
+		Size = UDim2.new((state[key] or default) / 100, 0, 1, 0),
+		BackgroundColor3 = ACCENT,
+	}, slider)
+	round(fill, 9)
+	local drag = make("TextButton", {
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new((state[key] or default) / 100, 0, 0.5, 0),
+		Size = UDim2.fromOffset(22, 22), BackgroundColor3 = Color3.fromRGB(255,255,255),
+		Text = "", AutoButtonColor = false,
+	}, slider)
+	round(drag, 11)
+	
+	sliderObjects[key] = { slider = slider, fill = fill, drag = drag, label = labelObj, row = row }
+	
+	local function updateSlider(val)
+		val = math.clamp(val, minVal or 0, maxVal or 100)
+		state[key] = val
+		fill.Size = UDim2.new(val / 100, 0, 1, 0)
+		drag.Position = UDim2.new(val / 100, 0, 0.5, 0)
+		labelObj.Text = label .. ": " .. tostring(val) .. "%"
+		print("[PiHub] " .. key .. " = " .. val)
+	end
+	
+	drag.MouseButton1Down:Connect(function()
+		local con, con2
+		con = UIS.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+				local relX = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+				updateSlider(math.round(relX * 100))
+			end
+		end)
+		con2 = UIS.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				con:Disconnect()
+				con2:Disconnect()
+			end
+		end)
+	end)
+	-- click sa slider mismo
+	slider.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			local relX = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+			updateSlider(math.round(relX * 100))
 		end
 	end)
-	return box
+	return slider
 end
 
 local function paintToggles()
@@ -202,34 +232,37 @@ local function paintToggles()
 		local on = state[key] == true
 		TS:Create(t.pill, TweenInfo.new(0.18), { BackgroundColor3 = on and t.accent or OFF }):Play()
 		TS:Create(t.knob, TweenInfo.new(0.18), {
-			Position = on and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3),
+			Position = on and UDim2.fromOffset(28, 4) or UDim2.fromOffset(4, 4),
 			BackgroundColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 210),
 		}):Play()
 	end
 end
 
+-- ================= UI LAYOUT =================
 sectionLabel("FARMING", 1)
-addToggle("autoFeeders", "Auto Feeders (Buy > Upgrade)", 2)
+addToggle("autoFeeders", "Auto Feeders", 2)
 addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
-addToggle("autoTower", "Auto Tower Run (anti-KO)", 4)
-addToggle("autoChaos", "Auto Chaos (TO CHAOS)", 5)
+addToggle("autoTower", "Auto Tower Run", 4)
+addToggle("autoChaos", "Auto Chaos", 5)
 sectionLabel("REWARDS", 6)
-addToggle("claimAll", "Auto Claim All (Daily/Missions/etc)", 7)
-addToggle("autoRebirth", "AUTO REBIRTH - instant pag READY", 8, WARN)
-sectionLabel("WORLD", 9)
+addToggle("claimAll", "Auto Claim All", 7)
+addToggle("autoRebirth", "Auto Rebirth", 8, WARN)
+sectionLabel("TOWER HP", 9)
+addSlider("hpThreshold", "HP threshold to start", 10, 100, 1, 100)
+sectionLabel("WORLD", 11)
 
 local function addButton(label, order, fn, color, textColor)
 	local b = make("TextButton", {
-		Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = color or CARD, LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 42), BackgroundColor3 = color or CARD, LayoutOrder = order,
 		Text = label, TextColor3 = textColor or TEXT, Font = Enum.Font.GothamBold,
-		TextSize = 13, AutoButtonColor = false,
+		TextSize = 15, AutoButtonColor = false,
 	}, body)
 	round(b, 9)
 	b.MouseButton1Click:Connect(fn)
 	return b
 end
 
-addButton("Realistic Coop Heights   >", 10, function()
+addButton("Realistic Coop Heights", 12, function()
 	task.spawn(function()
 		local K = 2.0
 		for _, name in ipairs({ "Coop1", "Coop2", "Coop3" }) do
@@ -254,66 +287,78 @@ addButton("Realistic Coop Heights   >", 10, function()
 	end)
 end)
 
-addToggle("uniformH", "Uniform Player Heights", 11)
+addToggle("uniformH", "Uniform Player Heights", 13)
 
-local unloadBtn = addButton("UNLOAD SCRIPT", 12, function()
+local unloadBtn = addButton("UNLOAD SCRIPT", 14, function()
 	print("[PiHub] unload requested from menu")
-	if type(_G.PiHubDestroy) == "function" then
-		_G.PiHubDestroy()
-	end
+	if type(_G.PiHubDestroy) == "function" then _G.PiHubDestroy() end
 end, Color3.fromRGB(60, 24, 28), Color3.fromRGB(255, 130, 130))
-round(unloadBtn, 9)
 
-sectionLabel("INFO", 13)
-
+sectionLabel("INFO", 15)
 local info = make("TextLabel", {
-	Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = CARD, LayoutOrder = 14,
-	Text = "...", RichText = true, TextColor3 = DIM, Font = Enum.Font.Code, TextSize = 12,
+	Size = UDim2.new(1, 0, 0, 110), BackgroundColor3 = CARD, LayoutOrder = 16,
+	Text = "...", RichText = true, TextColor3 = DIM, Font = Enum.Font.Code, TextSize = 13,
 	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 }, body)
 round(info, 9)
-make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingTop = UDim.new(0, 8) }, info)
+make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingTop = UDim.new(0, 8) }, info)
 
+-- ================= FLOATING ICON (draggable) =================
 local fab = make("ImageButton", {
-	Size = UDim2.fromOffset(46, 46), Position = UDim2.new(0, 16, 0.5, -23),
+	Size = UDim2.fromOffset(60, 60), 
+	Position = UDim2.new(0, 20, 0, 100), -- default position
 	BackgroundColor3 = ACCENT, Image = "", ZIndex = 5,
 }, gui)
-round(fab, 23)
+round(fab, 30)
 make("TextLabel", {
 	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "P",
-	TextColor3 = Color3.fromRGB(10, 30, 24), Font = Enum.Font.GothamBlack, TextSize = 22, ZIndex = 6,
+	TextColor3 = Color3.fromRGB(10, 30, 24), Font = Enum.Font.GothamBlack, TextSize = 28, ZIndex = 6,
 }, fab)
+
+-- drag logic
+local function makeDraggable(obj)
+	local dragging, dragInput, dragStart, startPos
+	obj.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = obj.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	obj.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			obj.Position = newPos
+		end
+	end)
+end
+makeDraggable(fab)
 
 local function setVisible(v)
 	main.Visible = v
 	fab.Visible = not v
 end
-fab.MouseButton1Click:Connect(function() setVisible(true) end)
+fab.MouseButton1Click:Connect(function() setVisible(not main.Visible) end)
 closeBtn.MouseButton1Click:Connect(function() setVisible(false) end)
+
 UIS.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if input.KeyCode == Enum.KeyCode.G then setVisible(not main.Visible) end
 end)
 
-do
-	local dragging, ds, sp = false, nil, nil
-	header.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			dragging, ds, sp = true, i.Position, main.Position
-		end
-	end)
-	UIS.InputChanged:Connect(function(i)
-		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-			local d = i.Position - ds
-			main.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
-		end
-	end)
-	UIS.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
-end
+-- ================= REST OF SCRIPT (helpers, loops, etc) =================
+-- (same as before, but we'll update the tower start condition)
 
 local function money()
 	if not okMods then return 0 end
@@ -390,7 +435,8 @@ task.spawn(function()
 					.. "\nRebirth #" .. tostring(cnt)
 					.. " -> needs floor " .. tostring(req)
 					.. (rbReady and " [READY]" or " [locked]")
-					.. "\nMax Feeder Level: " .. tostring(state.maxFeederLevel)
+					.. "\nMax Feeder: " .. tostring(state.maxFeederLevel)
+					.. " | HP threshold: " .. tostring(state.hpThreshold) .. "%"
 			end)
 			info.Text = (okR and txt) or "-"
 		else
@@ -400,7 +446,7 @@ task.spawn(function()
 	end
 end)
 
--- AUTO FEEDERS (may max level check)
+-- AUTO FEEDERS
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoFeeders and okMods then
@@ -434,7 +480,7 @@ task.spawn(function()
 	end
 end)
 
--- AUTO CLAIM ALL (same)
+-- AUTO CLAIM
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.claimAll and okMods then
@@ -474,7 +520,7 @@ task.spawn(function()
 	end
 end)
 
--- AUTO TOWER
+-- ================= AUTO TOWER (with HP threshold) =================
 local lastContinueAttempt = 0
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
@@ -521,17 +567,31 @@ task.spawn(function()
 			else
 				local busyWithBoss = state.autoChaos and findBoss() ~= nil
 				if not busyWithBoss then
+					-- Kunin ang HP at threshold
+					local hp = 0
 					pcall(function()
-						Mods.ChickenMode.order("tower")
-						task.wait(0.35)
-						local res = RS.Remotes.TowerStart:InvokeServer()
-						if res and res.ok then
-							print("[PiHub] TowerStart OK (floor 1)!")
-						else
-							print("[PiHub] TowerStart fail:", tostring(res and res.error))
+						local mine = myChickenBody()
+						if mine then
+							hp = tonumber(mine:GetAttribute(Mods.BodyProxy.Attr.HpFrac)) or 0
 						end
 					end)
-					task.wait(8)
+					local threshold = (state.hpThreshold or 100) / 100
+					if hp >= threshold then
+						pcall(function()
+							Mods.ChickenMode.order("tower")
+							task.wait(0.35)
+							local res = RS.Remotes.TowerStart:InvokeServer()
+							if res and res.ok then
+								print("[PiHub] TowerStart OK (floor 1)! HP: " .. math.floor(hp*100) .. "%")
+							else
+								print("[PiHub] TowerStart fail:", tostring(res and res.error))
+							end
+						end)
+						task.wait(8)
+					else
+						print("[PiHub] HP " .. math.floor(hp*100) .. "% < threshold " .. state.hpThreshold .. "%. Waiting...")
+						task.wait(2)
+					end
 				end
 			end
 		end
@@ -647,5 +707,5 @@ _G.PiHubDestroy = function()
 	print("[PiHub] unloaded")
 end
 
-print("[PiHub] loaded (gen " .. GEN .. ") - RightShift to toggle")
+print("[PiHub] loaded (gen " .. GEN .. ") - tap P icon or RightShift")
 setVisible(true)
