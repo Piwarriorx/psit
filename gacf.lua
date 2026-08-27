@@ -55,7 +55,7 @@ local state = {
 	autoTower = true,
 	autoRebirth = true,
 	autoChaos = false,
-	maxFeederLevel = 25,
+	maxFeederLevel = 35,
 	hpThreshold = 100,
 }
 if type(_G.HubSavedState) == "table" then
