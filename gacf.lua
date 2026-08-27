@@ -56,7 +56,7 @@ local state = {
 	autoRebirth = true,
 	autoChaos = false,
 	maxFeederLevel = 25,
-	hpThreshold = 99,
+	hpThreshold = 100,
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
