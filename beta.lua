@@ -1,11 +1,12 @@
 --[[
-	PI HUB  |  Grow a Chicken Fighter  (v8.7)  [FIXED REBIRTH]
+	PI HUB  |  Grow a Chicken Fighter  (v8.8)  [BOSS PRIORITY]
 	- Right Shift / tap P icon : menu toggle
 	- UNLOAD button sa menu o _G.PiHubDestroy()
 	- HP threshold slider (1–100%) bago mag-tower run
 	- Draggable floating icon (mobile-friendly)
 	- Compact at centered menu para sa mobile
-	- FIX: Awtomatikong nagre-retreat sa tower kapag ready na mag-rebirth
+	- PRIORITY: Auto Chaos > Auto Tower
+	- Awtomatikong nagre-retreat sa tower kapag may boss sa chaos/pit
 ]]
 
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
@@ -13,6 +14,7 @@ _G.HubGen = (_G.HubGen or 0) + 1
 local GEN = _G.HubGen
 _G.FeederAutoUpgrade = false
 _G.HubConns = _G.HubConns or {}
+_G.inChaosMode = false  -- bagong flag para malaman kung nasa chaos mode
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -287,7 +289,7 @@ sectionLabel("FARMING", 1)
 addToggle("autoFeeders", "Auto Feeders", 2)
 addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
 addToggle("autoTower", "Auto Tower Run", 4)
-addToggle("autoChaos", "Auto Chaos", 5)
+addToggle("autoChaos", "Auto Chaos (BOSS PRIORITY)", 5, Color3.fromRGB(200, 60, 60))  -- naka-red para warning
 sectionLabel("REWARDS", 6)
 addToggle("claimAll", "Auto Claim All", 7)
 addToggle("autoRebirth", "Auto Rebirth", 8, WARN)
@@ -388,15 +390,25 @@ local function towerActive()
 	return (a and a:GetAttribute("TowerActive")) == true, a and tonumber(a:GetAttribute("TowerFloor")) or 0
 end
 
-local BOSS_PAT = { "goose", "boss", "ufo", "kraken", "hotegg", "hot-egg", "event" }
+-- Mas malawak na boss detection
+local BOSS_PAT = {
+	"goose", "boss", "ufo", "kraken", "hotegg", "hot-egg",
+	"dragon", "demon", "devil", "giant", "mech", "robot",
+	"event", "halloween", "xmas", "christmas", "valentine", "easter"
+}
 local function findBoss()
 	if not okMods then return nil end
 	for _, part in ipairs(CS:GetTagged(Mods.BodyProxy.Tag)) do
 		if part:IsA("BasePart") then
 			local id = string.lower(tostring(part:GetAttribute(Mods.BodyProxy.Attr.EntityId) or ""))
-			for _, p in ipairs(BOSS_PAT) do
-				if #id > 0 and string.find(id, p, 1, true) then
-					return part
+			-- Huwag isama ang sariling manok o feeders
+			if string.find(id, "chicken") or string.find(id, "feeder") then
+				-- skip
+			else
+				for _, p in ipairs(BOSS_PAT) do
+					if #id > 0 and string.find(id, p, 1, true) then
+						return part
+					end
 				end
 			end
 		end
@@ -443,6 +455,7 @@ task.spawn(function()
 					hpTxt = hp and math.floor(hp * 100 + 0.5) .. "%" or "?"
 				end
 				local rbReady = (type(req) == "number") and best >= req
+				local bossExists = findBoss() ~= nil
 				return table.concat(parts, "  ")
 					.. "\nMoney: " .. tostring(math.floor((money() or 0) + 0.5))
 					.. " | Best: " .. tostring(best)
@@ -453,6 +466,8 @@ task.spawn(function()
 					.. (rbReady and " [READY]" or " [locked]")
 					.. "\nMax Feeder: " .. tostring(state.maxFeederLevel)
 					.. " | HP threshold: " .. tostring(state.hpThreshold) .. "%"
+					.. "\nBoss: " .. (bossExists and "🔥 ACTIVE" or "❌ none")
+					.. " | Chaos mode: " .. tostring(_G.inChaosMode)
 			end)
 			info.Text = (okR and txt) or "-"
 		else
@@ -536,7 +551,76 @@ task.spawn(function()
 	end
 end)
 
--- ===== AUTO TOWER (with HP threshold + rebirth readiness check) =====
+-- ===== AUTO CHAOS (BOSS PRIORITY - nagre-retreat sa tower) =====
+task.spawn(function()
+	while GEN == _G.HubGen do
+		if state.autoChaos and okMods then
+			local boss = findBoss()
+			
+			if boss then
+				-- ✅ MAY BOSS – i-priority ang chaos
+				_G.inChaosMode = true
+				
+				-- Kung nasa tower, mag-retreat agad
+				local active, _ = towerActive()
+				if active then
+					print("[PiHub] 🔥 Boss detected! Retreating from tower to fight chaos...")
+					pcall(function()
+						Mods.ChickenMode.order("coop")
+						RS.Remotes.TowerSurrender:InvokeServer()
+						RS.Remotes.TowerContinueDecline:FireServer()
+					end)
+					task.wait(2.5)  -- maghintay makalabas ng tower
+				end
+				
+				-- Pumunta sa boss (chaos)
+				pcall(function()
+					local char = LP.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+					if hrp and boss then
+						local bp = boss.Position
+						local dir = (hrp.Position - bp)
+						dir = Vector3.new(dir.X, 0, dir.Z)
+						if dir.Magnitude < 1 then dir = Vector3.new(1, 0, 0) end
+						dir = dir.Unit * 14
+						hrp.AssemblyLinearVelocity = Vector3.zero
+						char:PivotTo(CFrame.new(bp + dir + Vector3.new(0, 3, 0)) * (hrp.CFrame - hrp.Position))
+					end
+				end)
+				
+				-- I-set ang chicken sa chaos mode
+				pcall(function()
+					Mods.ChickenCtrl:setOrder("chaos")
+				end)
+				
+				print("[PiHub] ⚔️ Fighting chaos boss...")
+				task.wait(1)
+				
+			else
+				-- ❌ WALANG BOSS – bumalik sa normal
+				if _G.inChaosMode then
+					print("[PiHub] ✅ Boss defeated/disappeared. Returning to normal mode.")
+					_G.inChaosMode = false
+					
+					-- Kung naka-toggle ang auto tower, bumalik sa tower
+					if state.autoTower then
+						print("[PiHub] 🔄 Resuming tower runs...")
+					end
+				end
+				task.wait(0.5)
+			end
+		else
+			-- Kung naka-off ang auto chaos, i-reset ang flag
+			if _G.inChaosMode then
+				_G.inChaosMode = false
+				print("[PiHub] Auto Chaos disabled. Resetting chaos mode.")
+			end
+			task.wait(1)
+		end
+	end
+end)
+
+-- ===== AUTO TOWER (with HP threshold + rebirth readiness + chaos priority) =====
 local lastContinueAttempt = 0
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
@@ -552,6 +636,12 @@ end))
 
 task.spawn(function()
 	while GEN == _G.HubGen do
+		-- Kung nasa chaos mode, huwag mag-tower
+		if _G.inChaosMode then
+			task.wait(1)
+			continue
+		end
+		
 		if state.autoTower and okMods then
 			local active = false
 			pcall(function() active = towerActive() end)
@@ -583,7 +673,7 @@ task.spawn(function()
 			else
 				local busyWithBoss = state.autoChaos and findBoss() ~= nil
 				if not busyWithBoss then
-					-- 【BAGONG CHECK】Huwag magsimula ng tower kung ready na mag-rebirth
+					-- 【CHECK】Huwag magsimula ng tower kung ready na mag-rebirth
 					local rebirthReady = false
 					if state.autoRebirth and okMods then
 						pcall(function()
@@ -626,6 +716,10 @@ task.spawn(function()
 						print("[PiHub] Ready for rebirth, skipping tower start.")
 						task.wait(2)
 					end
+				else
+					-- May boss, hintayin matapos ang chaos
+					print("[PiHub] Boss active, tower on hold.")
+					task.wait(2)
 				end
 			end
 		end
@@ -638,6 +732,11 @@ local lastRebirthTry = 0
 local function tryRebirth(force)
 	if GEN ~= _G.HubGen then return end
 	if not (state.autoRebirth and okMods) then return end
+	-- Huwag mag-rebirth kung nasa chaos mode
+	if _G.inChaosMode then
+		print("[PiHub] In chaos mode, skipping rebirth.")
+		return
+	end
 
 	local now = os.clock()
 	if not force and now - lastRebirthTry < 4 then return end
@@ -650,7 +749,6 @@ local function tryRebirth(force)
 		local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
 		if not (okQ and best >= req) then return end
 
-		-- 【BAGONG LOGIC】Kung nasa tower, sumuko muna
 		local active, _ = towerActive()
 		if active then
 			print("[PiHub] Ready to rebirth but tower is active. Retreating...")
@@ -659,7 +757,6 @@ local function tryRebirth(force)
 			task.wait(2.5)
 		end
 
-		-- Double‑check kung wala na sa tower
 		local stillActive, _ = towerActive()
 		if not stillActive then
 			local res = RS.Remotes.Rebirth:InvokeServer()
@@ -694,38 +791,6 @@ task.spawn(function()
 	end
 end)
 
--- ===== CHAOS =====
-task.spawn(function()
-	while GEN == _G.HubGen do
-		if state.autoChaos and okMods then
-			pcall(function()
-				local boss = findBoss()
-				if boss then
-					local char = LP.Character
-					local hrp = char and char:FindFirstChild("HumanoidRootPart")
-					if hrp then
-						local bp = boss.Position
-						local dir = (hrp.Position - bp)
-						dir = Vector3.new(dir.X, 0, dir.Z)
-						if dir.Magnitude < 1 then dir = Vector3.new(1, 0, 0) end
-						dir = dir.Unit * 14
-						hrp.AssemblyLinearVelocity = Vector3.zero
-						char:PivotTo(CFrame.new(bp + dir + Vector3.new(0, 3, 0)) * (hrp.CFrame - hrp.Position))
-					end
-					state._lastChaosOrder = state._lastChaosOrder or 0
-					if os.clock() - state._lastChaosOrder > 3 then
-						state._lastChaosOrder = os.clock()
-						Mods.ChickenCtrl:setOrder("chaos")
-					end
-				else
-					state._lastChaosOrder = 0
-				end
-			end)
-		end
-		task.wait(2)
-	end
-end)
-
 -- ===== UNLOAD =====
 _G.PiHubDestroy = function()
 	_G.HubGen = _G.HubGen + 1
@@ -735,6 +800,7 @@ _G.PiHubDestroy = function()
 	table.clear(_G.HubConns or {})
 	if gui then pcall(function() gui:Destroy() end) end
 	_G.PiHubDestroy = nil
+	_G.inChaosMode = false
 	print("[PiHub] unloaded")
 end
 
