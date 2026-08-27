@@ -4,7 +4,6 @@
 	- UNLOAD button sa menu o _G.PiHubDestroy()
 ]]
 
--- LINIS MUNA: wasak ang lumang instance bago magsimula
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
 _G.HubGen = (_G.HubGen or 0) + 1
 local GEN = _G.HubGen
@@ -47,13 +46,12 @@ local state = {
 	autoFeeders = false, uniformH = false,
 	claimAll = false, autoTower = false, autoRebirth = false,
 	autoChaos = false,
-	maxFeederLevel = 25,  -- bagong setting: hanggang saan mag-uupgrade
+	maxFeederLevel = 999,
 }
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
 		if type(v) == "boolean" then state[k] = v end
 	end
-	-- restore max level if saved
 	if _G.HubSavedState.maxFeederLevel then
 		state.maxFeederLevel = _G.HubSavedState.maxFeederLevel
 	end
@@ -64,7 +62,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "PiHub"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 999
+gui.DisplayOrder = 25
 gui.Parent = PG
 
 local function make(class, props, parent)
@@ -78,7 +76,6 @@ local function round(o, r)
 	make("UICorner", { CornerRadius = UDim.new(0, r or 8) }, o)
 end
 
--- ================= MAIN WINDOW =================
 local main = make("Frame", {
 	Size = UDim2.fromOffset(320, 440),
 	Position = UDim2.new(0.5, -160, 0.5, -220),
@@ -121,7 +118,6 @@ local body = make("ScrollingFrame", {
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	CanvasSize = UDim2.new(), ScrollBarThickness = 3, ScrollBarImageColor3 = OFF,
 }, main)
-
 make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, body)
 make("UIPadding", { PaddingBottom = UDim.new(0, 6) }, body)
 
@@ -162,9 +158,9 @@ local function addToggle(key, label, order, accent)
 	end)
 end
 
--- ========== BAGONG FUNCTION: Number Input ==========
+-- Number input
 local numberInputs = {}
-local function addNumberInput(key, label, order, default, min, max)
+local function addNumberInput(key, label, order, default, minVal, maxVal)
 	local row = make("TextButton", {
 		Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = CARD, LayoutOrder = order,
 		Text = "", AutoButtonColor = false,
@@ -189,8 +185,8 @@ local function addNumberInput(key, label, order, default, min, max)
 		local num = tonumber(box.Text)
 		if num then
 			num = math.floor(num)
-			if min and num < min then num = min end
-			if max and num > max then num = max end
+			if minVal and num < minVal then num = minVal end
+			if maxVal and num > maxVal then num = maxVal end
 			state[key] = num
 			box.Text = tostring(num)
 			print("[PiHub] " .. key .. " = " .. num)
@@ -212,7 +208,6 @@ local function paintToggles()
 	end
 end
 
--- ================= UI ORDERS (naayos) =================
 sectionLabel("FARMING", 1)
 addToggle("autoFeeders", "Auto Feeders (Buy > Upgrade)", 2)
 addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
@@ -279,7 +274,6 @@ local info = make("TextLabel", {
 round(info, 9)
 make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingTop = UDim.new(0, 8) }, info)
 
--- ================= FLOATING TOGGLE =================
 local fab = make("ImageButton", {
 	Size = UDim2.fromOffset(46, 46), Position = UDim2.new(0, 16, 0.5, -23),
 	BackgroundColor3 = ACCENT, Image = "", ZIndex = 5,
@@ -321,7 +315,6 @@ do
 	end)
 end
 
--- ================= SHARED HELPERS =================
 local function money()
 	if not okMods then return 0 end
 	local ok, n = pcall(function() return Mods.Data.money():toNumber() end)
@@ -361,11 +354,12 @@ local function myChickenBody()
 	return nil
 end
 
--- ================= INFO / PAINT =================
 task.spawn(function()
 	while GEN == _G.HubGen do
 		paintToggles()
-		_G.HubSavedState = table.clone(state)
+		local saved = {}
+		for k, v in pairs(state) do saved[k] = v end
+		_G.HubSavedState = saved
 		if okMods then
 			local okR, txt = pcall(function()
 				local coop = Mods.Client:get({ "coop" })
@@ -406,14 +400,13 @@ task.spawn(function()
 	end
 end)
 
--- ================= AUTO FEEDERS (binago) =================
+-- AUTO FEEDERS (may max level check)
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoFeeders and okMods then
 			pcall(function()
 				local coop = Mods.Client:get({ "coop" })
 				if not coop then return end
-				-- Bumili ng bagong generator kung puwede (walang limit)
 				if Mods.CoopView.canBuyGenerator(coop.slots, #coop.generators) then
 					local cost = Mods.CoopView.buyGeneratorCost(#coop.generators)
 					if money() >= cost then
@@ -422,7 +415,6 @@ task.spawn(function()
 						coop = Mods.Client:get({ "coop" }) or coop
 					end
 				end
-				-- Mag-upgrade, pero hanggang maxFeederLevel lang
 				local maxLvl = state.maxFeederLevel or 999
 				for _, g in ipairs(coop.generators) do
 					local slot, lvl = tonumber(g.slot), tonumber(g.level)
@@ -442,7 +434,7 @@ task.spawn(function()
 	end
 end)
 
--- ================= AUTO CLAIM ALL =================
+-- AUTO CLAIM ALL (same)
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.claimAll and okMods then
@@ -482,9 +474,8 @@ task.spawn(function()
 	end
 end)
 
--- ================= AUTO TOWER =================
+-- AUTO TOWER
 local lastContinueAttempt = 0
-
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
 	local now = os.clock()
@@ -548,7 +539,7 @@ task.spawn(function()
 	end
 end)
 
--- ================= INSTANT AUTO REBIRTH =================
+-- REBIRTH
 local lastRebirthTry = 0
 local function tryRebirth(force)
 	if GEN ~= _G.HubGen then return end
@@ -581,4 +572,80 @@ end))
 table.insert(_G.HubConns, RS.Remotes.TowerDefeat.OnClientEvent:Connect(function()
 	if GEN == _G.HubGen then
 		task.delay(1, function()
-			pcall(funct
+			pcall(function() RS.Remotes.TowerContinueDecline:FireServer() end)
+		end)
+		task.delay(2, tryRebirth, true)
+	end
+end))
+
+task.spawn(function()
+	while GEN == _G.HubGen do
+		tryRebirth(false)
+		task.wait(5)
+	end
+end)
+
+-- CHAOS
+task.spawn(function()
+	while GEN == _G.HubGen do
+		if state.autoChaos and okMods then
+			pcall(function()
+				local boss = findBoss()
+				if boss then
+					local char = LP.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						local bp = boss.Position
+						local dir = (hrp.Position - bp)
+						dir = Vector3.new(dir.X, 0, dir.Z)
+						if dir.Magnitude < 1 then dir = Vector3.new(1, 0, 0) end
+						dir = dir.Unit * 14
+						hrp.AssemblyLinearVelocity = Vector3.zero
+						char:PivotTo(CFrame.new(bp + dir + Vector3.new(0, 3, 0)) * (hrp.CFrame - hrp.Position))
+					end
+					state._lastChaosOrder = state._lastChaosOrder or 0
+					if os.clock() - state._lastChaosOrder > 3 then
+						state._lastChaosOrder = os.clock()
+						Mods.ChickenCtrl:setOrder("chaos")
+					end
+				else
+					state._lastChaosOrder = 0
+				end
+			end)
+		end
+		task.wait(2)
+	end
+end)
+
+-- UNIFORM HEIGHTS
+task.spawn(function()
+	local TARGETS = { BodyHeightScale = 1, BodyWidthScale = 1, HeadScale = 1, BodyDepthScale = 1, BodyProportionScale = 1 }
+	while GEN == _G.HubGen do
+		if state.uniformH then
+			pcall(function()
+				for _, plr in ipairs(Players:GetPlayers()) do
+					local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+					if hum then
+						for nm, val in pairs(TARGETS) do
+							local v = hum:FindFirstChild(nm)
+							if v and v:IsA("NumberValue") then v.Value = val end
+						end
+					end
+				end
+			end)
+		end
+		task.wait(2)
+	end
+end)
+
+_G.PiHubDestroy = function()
+	_G.HubGen = _G.HubGen + 1
+	for _, c in ipairs(_G.HubConns) do pcall(function() c:Disconnect() end) end
+	table.clear(_G.HubConns)
+	gui:Destroy()
+	_G.PiHubDestroy = nil
+	print("[PiHub] unloaded")
+end
+
+print("[PiHub] loaded (gen " .. GEN .. ") - RightShift to toggle")
+setVisible(true)
