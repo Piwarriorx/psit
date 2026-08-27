@@ -1,16 +1,16 @@
 --[[
-	PI HUB  |  Grow a Chicken Fighter  (v8)
+	PI HUB  |  Grow a Chicken Fighter  (v8.5)
 	- Right Shift / tap P icon : menu toggle
 	- UNLOAD button sa menu o _G.PiHubDestroy()
 	- HP threshold slider (1–100%) bago mag-tower run
-	- Draggable floating icon
+	- Draggable floating icon (mobile-friendly)
 ]]
 
 if type(_G.PiHubDestroy) == "function" then pcall(_G.PiHubDestroy) end
 _G.HubGen = (_G.HubGen or 0) + 1
 local GEN = _G.HubGen
 _G.FeederAutoUpgrade = false
-_G.HubConns = {}
+_G.HubConns = _G.HubConns or {}
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -20,6 +20,7 @@ local UIS = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
 
+-- ===== LOAD MODULES =====
 local okMods, Mods = pcall(function()
 	local PS = LP.PlayerScripts
 	return {
@@ -35,22 +36,29 @@ local okMods, Mods = pcall(function()
 	}
 end)
 
+if not okMods then
+	warn("[PiHub] Failed to load required modules. Make sure you're in 'Grow a Chicken Fighter'.")
+	return
+end
+
+-- ===== COLORS =====
 local ACCENT = Color3.fromRGB(0, 195, 140)
 local WARN = Color3.fromRGB(240, 160, 60)
-local DANGER = Color3.fromRGB(200, 60, 60)
 local BG = Color3.fromRGB(17, 17, 23)
 local CARD = Color3.fromRGB(26, 26, 34)
 local TEXT = Color3.fromRGB(235, 235, 240)
 local DIM = Color3.fromRGB(150, 150, 165)
 local OFF = Color3.fromRGB(55, 55, 68)
 
+-- ===== STATE =====
 local state = {
 	autoFeeders = false, uniformH = false,
 	claimAll = false, autoTower = false, autoRebirth = false,
 	autoChaos = false,
 	maxFeederLevel = 25,
-	hpThreshold = 100,   -- default 100% (full HP)
+	hpThreshold = 100,
 }
+
 if type(_G.HubSavedState) == "table" then
 	for k, v in pairs(_G.HubSavedState) do
 		if type(v) == "boolean" then state[k] = v end
@@ -60,11 +68,12 @@ if type(_G.HubSavedState) == "table" then
 end
 _G.HubState = state
 
+-- ===== GUI =====
 local gui = Instance.new("ScreenGui")
 gui.Name = "PiHub"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 100
+gui.DisplayOrder = 999
 gui.Parent = PG
 
 local function make(class, props, parent)
@@ -78,10 +87,10 @@ local function round(o, r)
 	make("UICorner", { CornerRadius = UDim.new(0, r or 8) }, o)
 end
 
--- ================= MAIN WINDOW (mobile-friendly) =================
+-- ===== MAIN WINDOW =====
 local main = make("Frame", {
-	Size = UDim2.fromScale(0.9, 0.85),  -- gumagamit ng scale para flexible
-	Position = UDim2.new(0.5, -160, 0.5, -240), -- center
+	Size = UDim2.fromScale(0.9, 0.85),
+	Position = UDim2.new(0.5, -160, 0.5, -240),
 	BackgroundColor3 = BG, Active = true, Visible = false,
 }, gui)
 round(main, 12)
@@ -91,11 +100,6 @@ local header = make("Frame", {
 	Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Color3.fromRGB(13, 13, 18),
 }, main)
 round(header, 12)
-make("Frame", {
-	AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1),
-	Size = UDim2.new(1, 0, 0, 12), BackgroundColor3 = header.BackgroundColor3,
-	BorderSizePixel = 0,
-}, header)
 
 make("TextLabel", {
 	Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -60, 0, 22),
@@ -124,6 +128,7 @@ local body = make("ScrollingFrame", {
 make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, body)
 make("UIPadding", { PaddingBottom = UDim.new(0, 8) }, body)
 
+-- ===== UI HELPERS =====
 local function sectionLabel(text, order)
 	make("TextLabel", {
 		Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, LayoutOrder = order,
@@ -161,7 +166,44 @@ local function addToggle(key, label, order, accent)
 	end)
 end
 
--- ================= SLIDER para sa HP Threshold =================
+-- ===== NUMBER INPUT =====
+local function addNumberInput(key, label, order, default, minVal, maxVal)
+	local row = make("TextButton", {
+		Size = UDim2.new(1, 0, 0, 42), BackgroundColor3 = CARD, LayoutOrder = order,
+		Text = "", AutoButtonColor = false,
+	}, body)
+	round(row, 9)
+	make("TextLabel", {
+		Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -120, 1, 0),
+		BackgroundTransparency = 1, Text = label, TextColor3 = TEXT,
+		Font = Enum.Font.GothamMedium, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left,
+	}, row)
+	local box = make("TextBox", {
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(90, 30), BackgroundColor3 = OFF,
+		Text = tostring(state[key] or default), TextColor3 = TEXT,
+		Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center,
+		ClearTextOnFocus = false,
+	}, row)
+	round(box, 6)
+	make("UIStroke", { Color = Color3.fromRGB(80, 80, 100), Thickness = 1 }, box)
+	box.FocusLost:Connect(function()
+		local num = tonumber(box.Text)
+		if num then
+			num = math.floor(num)
+			if minVal and num < minVal then num = minVal end
+			if maxVal and num > maxVal then num = maxVal end
+			state[key] = num
+			box.Text = tostring(num)
+			print("[PiHub] " .. key .. " = " .. num)
+		else
+			box.Text = tostring(state[key] or default)
+		end
+	end)
+	return box
+end
+
+-- ===== SLIDER =====
 local sliderObjects = {}
 local function addSlider(key, label, order, default, minVal, maxVal)
 	local row = make("Frame", {
@@ -217,7 +259,6 @@ local function addSlider(key, label, order, default, minVal, maxVal)
 			end
 		end)
 	end)
-	-- click sa slider mismo
 	slider.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			local relX = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
@@ -238,7 +279,7 @@ local function paintToggles()
 	end
 end
 
--- ================= UI LAYOUT =================
+-- ===== BUILD UI =====
 sectionLabel("FARMING", 1)
 addToggle("autoFeeders", "Auto Feeders", 2)
 addNumberInput("maxFeederLevel", "Max Upgrade Level", 3, 999, 1, 9999)
@@ -303,10 +344,10 @@ local info = make("TextLabel", {
 round(info, 9)
 make("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingTop = UDim.new(0, 8) }, info)
 
--- ================= FLOATING ICON (draggable) =================
+-- ===== FLOATING ICON (draggable) =====
 local fab = make("ImageButton", {
 	Size = UDim2.fromOffset(60, 60), 
-	Position = UDim2.new(0, 20, 0, 100), -- default position
+	Position = UDim2.new(0, 20, 0, 100),
 	BackgroundColor3 = ACCENT, Image = "", ZIndex = 5,
 }, gui)
 round(fab, 30)
@@ -315,51 +356,68 @@ make("TextLabel", {
 	TextColor3 = Color3.fromRGB(10, 30, 24), Font = Enum.Font.GothamBlack, TextSize = 28, ZIndex = 6,
 }, fab)
 
--- drag logic
+-- drag logic (robust)
 local function makeDraggable(obj)
 	local dragging, dragInput, dragStart, startPos
-	obj.InputBegan:Connect(function(input)
+	local connection1, connection2, connection3
+	
+	connection1 = obj.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
 			startPos = obj.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
 		end
 	end)
-	obj.InputChanged:Connect(function(input)
+	
+	connection2 = obj.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			dragInput = input
 		end
 	end)
-	UIS.InputChanged:Connect(function(input)
+	
+	connection3 = UIS.InputChanged:Connect(function(input)
 		if input == dragInput and dragging then
 			local delta = input.Position - dragStart
 			local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			obj.Position = newPos
 		end
 	end)
+	
+	UIS.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	
+	return { connection1, connection2, connection3 }
 end
 makeDraggable(fab)
 
+-- ===== TOGGLE VISIBILITY =====
 local function setVisible(v)
+	if not main or not fab then return end
 	main.Visible = v
 	fab.Visible = not v
 end
-fab.MouseButton1Click:Connect(function() setVisible(not main.Visible) end)
-closeBtn.MouseButton1Click:Connect(function() setVisible(false) end)
+
+fab.MouseButton1Click:Connect(function()
+	if main then setVisible(not main.Visible) end
+end)
+
+if closeBtn then
+	closeBtn.MouseButton1Click:Connect(function()
+		setVisible(false)
+	end)
+end
 
 UIS.InputBegan:Connect(function(input, gp)
 	if gp then return end
-	if input.KeyCode == Enum.KeyCode.G then setVisible(not main.Visible) end
+	if input.KeyCode == Enum.KeyCode.G or input.KeyCode == Enum.KeyCode.RightShift then
+		setVisible(not main.Visible)
+	end
 end)
 
--- ================= REST OF SCRIPT (helpers, loops, etc) =================
--- (same as before, but we'll update the tower start condition)
-
+-- ===== HELPERS =====
 local function money()
 	if not okMods then return 0 end
 	local ok, n = pcall(function() return Mods.Data.money():toNumber() end)
@@ -399,6 +457,7 @@ local function myChickenBody()
 	return nil
 end
 
+-- ===== INFO UPDATE =====
 task.spawn(function()
 	while GEN == _G.HubGen do
 		paintToggles()
@@ -446,7 +505,7 @@ task.spawn(function()
 	end
 end)
 
--- AUTO FEEDERS
+-- ===== AUTO FEEDERS =====
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoFeeders and okMods then
@@ -480,7 +539,7 @@ task.spawn(function()
 	end
 end)
 
--- AUTO CLAIM
+-- ===== AUTO CLAIM =====
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.claimAll and okMods then
@@ -520,7 +579,7 @@ task.spawn(function()
 	end
 end)
 
--- ================= AUTO TOWER (with HP threshold) =================
+-- ===== AUTO TOWER (with HP threshold) =====
 local lastContinueAttempt = 0
 table.insert(_G.HubConns, RS.Remotes.TowerContinueOffer.OnClientEvent:Connect(function(payload)
 	if GEN ~= _G.HubGen or not state.autoTower then return end
@@ -567,7 +626,6 @@ task.spawn(function()
 			else
 				local busyWithBoss = state.autoChaos and findBoss() ~= nil
 				if not busyWithBoss then
-					-- Kunin ang HP at threshold
 					local hp = 0
 					pcall(function()
 						local mine = myChickenBody()
@@ -599,7 +657,7 @@ task.spawn(function()
 	end
 end)
 
--- REBIRTH
+-- ===== REBIRTH =====
 local lastRebirthTry = 0
 local function tryRebirth(force)
 	if GEN ~= _G.HubGen then return end
@@ -645,7 +703,7 @@ task.spawn(function()
 	end
 end)
 
--- CHAOS
+-- ===== CHAOS =====
 task.spawn(function()
 	while GEN == _G.HubGen do
 		if state.autoChaos and okMods then
@@ -677,7 +735,7 @@ task.spawn(function()
 	end
 end)
 
--- UNIFORM HEIGHTS
+-- ===== UNIFORM HEIGHTS =====
 task.spawn(function()
 	local TARGETS = { BodyHeightScale = 1, BodyWidthScale = 1, HeadScale = 1, BodyDepthScale = 1, BodyProportionScale = 1 }
 	while GEN == _G.HubGen do
@@ -698,14 +756,19 @@ task.spawn(function()
 	end
 end)
 
+-- ===== UNLOAD =====
 _G.PiHubDestroy = function()
 	_G.HubGen = _G.HubGen + 1
-	for _, c in ipairs(_G.HubConns) do pcall(function() c:Disconnect() end) end
-	table.clear(_G.HubConns)
-	gui:Destroy()
+	for _, c in ipairs(_G.HubConns or {}) do 
+		pcall(function() c:Disconnect() end) 
+	end
+	table.clear(_G.HubConns or {})
+	if gui then pcall(function() gui:Destroy() end) end
 	_G.PiHubDestroy = nil
 	print("[PiHub] unloaded")
 end
 
+-- ===== LOAD =====
 print("[PiHub] loaded (gen " .. GEN .. ") - tap P icon or RightShift")
+task.wait(0.5)
 setVisible(true)
