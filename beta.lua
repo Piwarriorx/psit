@@ -615,26 +615,51 @@ task.spawn(function()
 	end
 end)
 
--- ===== REBIRTH =====
+-- ===== REBIRTH (with auto-retreat) =====
 local lastRebirthTry = 0
 local function tryRebirth(force)
-	if GEN ~= _G.HubGen then return end
-	if not (state.autoRebirth and okMods) then return end
-	local now = os.clock()
-	if not force and now - lastRebirthTry < 4 then return end
-	lastRebirthTry = now
-	pcall(function()
-		local act = towerActive()
-		if act then return end
-		local rb = Mods.Data.rebirth()
-		local cnt = rb and rb.count or 0
-		local best = tonumber(Mods.Data.towerBest()) or 0
-		local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
-		if okQ and best >= req then
-			local res = RS.Remotes.Rebirth:InvokeServer()
-			print("[PiHub] REBIRTH FIRED:", tostring(res and res.ok))
-		end
-	end)
+    if GEN ~= _G.HubGen then return end
+    if not (state.autoRebirth and okMods) then return end
+
+    local now = os.clock()
+    if not force and now - lastRebirthTry < 4 then return end
+    lastRebirthTry = now
+
+    pcall(function()
+        -- Kunin ang rebirth data at requirements
+        local rb = Mods.Data.rebirth()
+        local cnt = rb and rb.count or 0
+        local best = tonumber(Mods.Data.towerBest()) or 0
+        local okQ, req = pcall(Mods.RebirthBonus.requirementFloorFor, cnt)
+        
+        -- Kung hindi pa ready mag-rebirth, exit
+        if not (okQ and best >= req) then return end
+
+        -- [BAGONG LOGIC] Tingnan kung active ang tower
+        local active, _ = towerActive()
+        if active then
+            print("[PiHub] Ready to rebirth pero nasa Tower pa. Nagre-retreat...")
+            
+            -- 1. I-surrender ang tower run
+            RS.Remotes.TowerSurrender:InvokeServer()
+            
+            -- 2. I-decline din ang continue offer (para sure)
+            RS.Remotes.TowerContinueDecline:FireServer()
+            
+            -- 3. Maghintay ng 2.5 segundo para bumalik sa coop
+            task.wait(2.5)
+        end
+
+        -- Pagkatapos maghintay (o kung hindi naman active), subukang mag-rebirth
+        -- Double-check kung active pa rin (baka nag-glitch)
+        local stillActive, _ = towerActive()
+        if not stillActive then
+            local res = RS.Remotes.Rebirth:InvokeServer()
+            print("[PiHub] REBIRTH FIRED:", tostring(res and res.ok))
+        else
+            print("[PiHub] Tower still active after retreat, cannot rebirth yet.")
+        end
+    end)
 end
 
 table.insert(_G.HubConns, RS.Remotes.TowerRunEnded.OnClientEvent:Connect(function()
